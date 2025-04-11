@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarDeal Pro | Your Premium Car Marketplace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <style>
+        .glass {
+            background: rgba(17, 25, 40, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.125);
+        }
+        body {
+            background: linear-gradient(45deg, #1a1a1a, #2d3748);
+            min-height: 100vh;
+        }
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="text-gray-100">
+    <div id="loading" class="loading">
+        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+    </div>
+
+    <nav class="glass fixed w-full z-50 px-6 py-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">CarDeal Pro</h1>
+            <div class="flex gap-4">
+                <button onclick="toggleModal('loginModal')" class="px-4 py-2 rounded glass hover:bg-blue-600 transition" id="loginBtn">Login</button>
+                <button onclick="showListingForm()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 transition" id="sellCarBtn" style="display: none;">Sell Car</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto pt-24 px-4">
+        <section class="glass rounded-lg p-6 mb-8">
+            <h2 class="text-3xl font-bold mb-6">Featured Cars</h2>
+            <div id="carListings" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Car listings will be populated here -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="glass rounded-lg p-8 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold mb-4">Login</h2>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block mb-2">Email</label>
+                    <input type="email" id="loginEmail" class="w-full p-2 rounded bg-gray-800 border border-gray-700" required>
+                </div>
+                <div>
+                    <label class="block mb-2">Password</label>
+                    <input type="password" id="loginPassword" class="w-full p-2 rounded bg-gray-800 border border-gray-700" required>
+                </div>
+                <button type="submit" class="w-full py-2 bg-blue-600 rounded hover:bg-blue-700 transition">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Car Listing Form -->
+    <div id="listingForm" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="glass rounded-lg p-8 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold mb-4">Sell Your Car</h2>
+            <form id="carForm" class="space-y-4">
+                <div>
+                    <label class="block mb-2">Car Model</label>
+                    <input type="text" id="carModel" class="w-full p-2 rounded bg-gray-800 border border-gray-700" required>
+                </div>
+                <div>
+                    <label class="block mb-2">Year</label>
+                    <input type="number" id="carYear" class="w-full p-2 rounded bg-gray-800 border border-gray-700" required>
+                </div>
+                <div>
+                    <label class="block mb-2">Price</label>
+                    <input type="number" id="carPrice" class="w-full p-2 rounded bg-gray-800 border border-gray-700" required>
+                </div>
+                <div>
+                    <label class="block mb-2">Description</label>
+                    <textarea id="carDescription" class="w-full p-2 rounded bg-gray-800 border border-gray-700" required></textarea>
+                </div>
+                <button type="submit" class="w-full py-2 bg-blue-600 rounded hover:bg-blue-700 transition">List Car</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        let currentUser = null;
+
+        // Toggle Modal Function
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.toggle('hidden');
+        }
+
+        // Show Loading
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        // Hide Loading
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Login Form Handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                toggleModal('loginModal');
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('sellCarBtn').style.display = 'block';
+            } catch (error) {
+                alert('Login failed: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Show Listing Form
+        function showListingForm() {
+            document.getElementById('listingForm').classList.remove('hidden');
+        }
+
+        // Car Listing Form Handler
+        document.getElementById('carForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const carData = {
+                model: document.getElementById('carModel').value,
+                year: document.getElementById('carYear').value,
+                price: document.getElementById('carPrice').value,
+                description: document.getElementById('carDescription').value,
+                sellerId: currentUser.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                await db.collection('cars').add(carData);
+                document.getElementById('listingForm').classList.add('hidden');
+                document.getElementById('carForm').reset();
+                loadCarListings();
+            } catch (error) {
+                alert('Failed to list car: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Load Car Listings
+        async function loadCarListings() {
+            showLoading();
+            const carListings = document.getElementById('carListings');
+            carListings.innerHTML = '';
+
+            try {
+                const snapshot = await db.collection('cars').orderBy('createdAt', 'desc').get();
+                snapshot.forEach(doc => {
+                    const car = doc.data();
+                    const carElement = document.createElement('div');
+                    carElement.className = 'glass rounded-lg p-4 hover:scale-105 transition duration-300';
+                    carElement.innerHTML = `
+                        <h3 class="text-xl font-bold mb-2">${car.model} (${car.year})</h3>
+                        <p class="text-gray-300 mb-2">${car.description}</p>
+                        <p class="text-2xl font-bold text-blue-400">$${car.price}</p>
+                        <button onclick="contactSeller('${car.sellerId}')" class="mt-4 w-full py-2 bg-blue-600 rounded hover:bg-blue-700 transition">
+                            Contact Seller
+                        </button>
+                    `;
+                    carListings.appendChild(carElement);
+                });
+            } catch (error) {
+                console.error('Error loading listings:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Contact Seller Function
+        function contactSeller(sellerId) {
+            if (!currentUser) {
+                alert('Please login to contact the seller');
+                toggleModal('loginModal');
+                return;
+            }
+            alert('Contact feature coming soon!');
+        }
+
+        // Auth State Observer
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            if (user) {
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('sellCarBtn').style.display = 'block';
+            } else {
+                document.getElementById('loginBtn').style.display = 'block';
+                document.getElementById('sellCarBtn').style.display = 'none';
+            }
+        });
+
+        // Initial Load
+        loadCarListings();
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
